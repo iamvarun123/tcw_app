@@ -1,3 +1,4 @@
+yes | sdkmanager --licenses
 name: Build APK
 
 on:
