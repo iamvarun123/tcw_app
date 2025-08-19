@@ -1,0 +1,71 @@
+name: Build APK
+
+on:
+  workflow_dispatch:   # allows manual trigger
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      # Setup Java JDK 17 (needed for Android)
+      - name: Setup JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Install system dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-dev build-essential \
+            git zip unzip wget libffi-dev \
+            libssl-dev libsqlite3-dev
+
+      # Install Buildozer & Cython
+      - name: Install buildozer
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython
+
+      # Download Android SDK commandline tools
+      - name: Setup Android SDK
+        run: |
+          mkdir -p $HOME/android-sdk
+          cd $HOME/android-sdk
+          wget https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -O cmdtools.zip
+          unzip cmdtools.zip -d cmdline-tools
+          yes | cmdline-tools/bin/sdkmanager --licenses
+          cmdline-tools/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2"
+
+      # Build APK
+      - name: Build APK
+        run: |
+          export ANDROIDSDK=$HOME/android-sdk
+          export PATH=$ANDROIDSDK/cmdline-tools/bin:$ANDROIDSDK/platform-tools:$ANDROIDSDK/emulator:$PATH
+          buildozer -v android debug
+
+      # Upload APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: MyApp-APK
+          path: bin/*.apk
